@@ -23,9 +23,9 @@ def verify(request: Request):
     raise HTTPException(status_code=403)
 
 
-def _handle(number: str, text: str) -> None:
+def _handle(number: str, text: str, role: str) -> None:
     try:
-        whatsapp.send_text(number, assistant.reply(number, text))
+        whatsapp.send_text(number, assistant.reply(number, text, role))
     except Exception:
         log.exception("Gagal memproses pesan dari %s", number)
         whatsapp.send_text(number, "Maaf Pak, ada gangguan. Coba lagi sebentar lagi.")
@@ -41,10 +41,14 @@ async def receive(request: Request, background: BackgroundTasks):
         for change in entry.get("changes", []):
             for msg in change.get("value", {}).get("messages", []):
                 number = msg.get("from", "")
-                if number not in config.ALLOWED_WA_NUMBERS:
+                if number == config.OWNER_WA_NUMBER:
+                    role = "owner"
+                elif number in config.ADMIN_WA_NUMBERS:
+                    role = "admin"
+                else:
                     log.info("Abaikan pesan dari nomor tidak terdaftar")
                     continue
                 if msg.get("type") == "text":
-                    background.add_task(_handle, number, msg["text"]["body"])
+                    background.add_task(_handle, number, msg["text"]["body"], role)
     # Meta needs a fast 200, the reply is sent in the background.
     return {"status": "received"}
